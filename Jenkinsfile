@@ -62,7 +62,11 @@ pipeline {
     
     post {
         always {
-            sh 'rm -f dynamic_inventory.ini'
+            script {
+            node(label: env.NODE_NAME ?: 'any') { 
+                sh 'rm -f dynamic_inventory.ini'
+            }
+        }
         }
     }
 }
