@@ -16,7 +16,7 @@ pipeline {
         }
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan'
+                sh 'terraform plan -var-file=$BRANCH_NAME.tfvars -out=tfplan.out'
             }
         }
         stage('Validate Apply') {
@@ -107,7 +107,7 @@ pipeline {
             echo 'Success!'
         }
         failure {
-            sh 'terraform destroy -auto-approve -var-file=$BRANCH_NAME.tfvars || echo "Cleanup failed, please check manually."''
+            sh 'terraform destroy -auto-approve -var-file=$BRANCH_NAME.tfvars || echo "Cleanup failed, please check manually."'
         }
     }
 }
