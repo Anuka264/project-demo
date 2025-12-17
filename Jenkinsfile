@@ -5,7 +5,7 @@ pipeline {
         TF_CLI_ARGS = '-no-color'
         SSH_CRED_ID = 'aws-deployer-ssh-key'
         TF_CLI_CONFIG_FILE = credentials('aws-creds')
-        BRANCH_NAME = "dev"
+        BRANCH_NAME = "main"
     }
 
     stages {
