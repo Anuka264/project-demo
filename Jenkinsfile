@@ -5,20 +5,20 @@ pipeline {
         TF_CLI_ARGS = '-no-color'
         SSH_CRED_ID = 'aws-deployer-ssh-key'
         TF_CLI_CONFIG_FILE = credentials('aws-creds')
-        BRANCH_NAME = 'main'
+        BRANCH_NAME = "dev"
     }
 
     stages {
         stage('Terraform Initialization') {
             steps {
                 sh 'terraform init'
-                sh 'cat $(env.BRANCH_NAME).tfvars'
+                sh "cat ${env.BRANCH_NAME}.tfvars"
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan -var-file=$(env.BRANCH_NAME).tfvars'
+                sh "terraform plan -var-file=${env.BRANCH_NAME}.tfvars"
             }
         }
 
@@ -36,7 +36,7 @@ pipeline {
         stage('Terraform Provisioning') {
             steps {
                 script {
-                    sh 'terraform apply -auto-approve -var-file=$(env.BRANCH_NAME).tfvars'
+                    sh "terraform apply -auto-approve -var-file=${env.BRANCH_NAME}.tfvars"
 
 
                     // 1. Extract Public IP Address of the provisioned instance
@@ -107,7 +107,7 @@ pipeline {
 
         stage('Destroy') {
             steps {
-                sh 'terraform destroy -auto-approve -var-file=$(env.BRANCH_NAME).tfvars'
+                sh "terraform destroy -auto-approve -var-file=${env.BRANCH_NAME}.tfvars"
             }
         }
     }    
@@ -120,7 +120,7 @@ pipeline {
             echo 'Success!'
         }
         failure {
-            sh 'terraform destroy -auto-approve -var-file=$(env.BRANCH_NAME).tfvars || echo "Cleanup failed, please check manually."'
+            sh "terraform destroy -auto-approve -var-file=${env.BRANCH_NAME}.tfvars || echo \"Cleanup failed, please check manually.\""
         }
     }
 } 
