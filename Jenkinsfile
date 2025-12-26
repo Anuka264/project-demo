@@ -1,19 +1,21 @@
 pipeline {
     agent any
+    
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
         AWS_DEFAULT_REGION    = 'us-east-1'
 
         TF_IN_AUTOMATION = 'true'
-        TF_CLI_ARGS = '-no-color'
-        SSH_CRED_ID = 'aws-deployer-ssh-key'
-        BRANCH_NAME = "main"
+        TF_CLI_ARGS      = '-no-color'
+        SSH_CRED_ID      = 'aws-deployer-ssh-key'
+        BRANCH_NAME      = "main"
     }
 
     stages {
         stage('Terraform Initialization') {
             steps {
+                // This will now work because AWS credentials are in the environment
                 sh 'terraform init'
                 sh "cat ${env.BRANCH_NAME}.tfvars"
             }
@@ -25,13 +27,11 @@ pipeline {
             }
         }
 
-
         stage('Validate Apply') {
             input {
                 message "Do you want to apply this plan?"
                 ok "Apply"
             }
-
             steps {
                 echo 'Apply Accepted'
             }
@@ -42,14 +42,12 @@ pipeline {
                 script {
                     sh "terraform apply -auto-approve -var-file=${env.BRANCH_NAME}.tfvars"
 
-
-                    // 1. Extract Public IP Address of the provisioned instance
+                    // Extract outputs for later stages
                     env.INSTANCE_IP = sh(
                         script: 'terraform output -raw instance_public_ip',
                         returnStdout: true
                     ).trim()
 
-                    // 2. Extract Instance ID (for AWS CLI wait)
                     env.INSTANCE_ID = sh(
                         script: 'terraform output -raw instance_id',
                         returnStdout: true
@@ -58,7 +56,6 @@ pipeline {
                     echo "Provisioned Instance IP: ${env.INSTANCE_IP}"
                     echo "Provisioned Instance ID: ${env.INSTANCE_ID}"
 
-                    // 3. Create a dynamic inventory file for Ansible
                     sh "echo '${env.INSTANCE_IP}' > dynamic_inventory.ini"
                 }
             }
@@ -66,13 +63,10 @@ pipeline {
 
         stage('Wait for AWS Instance Status') {
             steps {
-                echo "Waiting for instance ${env.INSTANCE_ID} to pass AWS health checks..."
-
-                // --- This is the simple, powerful AWS CLI command ---
-                // It polls AWS until status checks pass or it hits the default timeout (usually 15 minutes)
-                sh "aws ec2 wait instance-status-ok --instance-ids ${env.INSTANCE_ID} --region us-east-2"  
-
-                echo 'AWS instance health checks passed. Proceeding to Ansible.'
+                echo "Waiting for instance ${env.INSTANCE_ID} to pass health checks in ${env.AWS_DEFAULT_REGION}..."
+                // Using the environment variable for region to keep it consistent
+                sh "aws ec2 wait instance-status-ok --instance-ids ${env.INSTANCE_ID} --region ${env.AWS_DEFAULT_REGION}"  
+                echo 'AWS instance health checks passed.'
             }
         }
 
@@ -81,7 +75,6 @@ pipeline {
                 message "Do you want to run Ansible?"
                 ok "Run Ansible"
             }
-
             steps {
                 echo 'Ansible approved'
             }
@@ -89,21 +82,19 @@ pipeline {
 
         stage('Ansible Configuration') {
             steps {
-                // Now you can proceed directly to Ansible, knowing SSH is almost certainly ready.
                 ansiblePlaybook(
                     playbook: 'playbooks/grafana.yml',
                     inventory: 'dynamic_inventory.ini',
-                    credentialsId: SSH_CRED_ID, // Key is securely injected by the plugin here
+                    credentialsId: env.SSH_CRED_ID
                 )
             }
         }
 
         stage('Validate Destroy') {
             input {
-                message "Do you want to destroy??"
+                message "Do you want to destroy resources?"
                 ok "Destroy"
             }
-
             steps {
                 echo 'Destroy Approved'
             }
@@ -118,13 +109,15 @@ pipeline {
 
     post {
         always {
+            // This sh step now has the 'agent any' context correctly
             sh 'rm -f dynamic_inventory.ini'
         }
         success {
-            echo 'Success!'
+            echo 'Deployment Finished Successfully!'
         }
         failure {
-            sh "terraform destroy -auto-approve -var-file=${env.BRANCH_NAME}.tfvars || echo \"Cleanup failed, please check manually.\""
+            // Attempt cleanup only if initialization succeeded and state exists
+            sh "terraform destroy -auto-approve -var-file=${env.BRANCH_NAME}.tfvars || echo 'Cleanup skipped or failed.'"
         }
     }
-} 
+}
