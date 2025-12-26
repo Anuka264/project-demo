@@ -1,10 +1,13 @@
 pipeline {
     agent any
     environment {
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+        AWS_DEFAULT_REGION    = 'us-east-1'
+
         TF_IN_AUTOMATION = 'true'
         TF_CLI_ARGS = '-no-color'
         SSH_CRED_ID = 'aws-deployer-ssh-key'
-        TF_CLI_CONFIG_FILE = credentials('aws-creds')
         BRANCH_NAME = "main"
     }
 
