@@ -82,7 +82,12 @@ pipeline {
 
         stage('Ansible Configuration') {
             steps {
-                ansiblePlaybook(
+                sleep 20
+
+                script {
+                    env.ANSIBLE_HOST_KEY_CHECKING = 'False'
+
+                    ansiblePlaybook(
                     playbook: 'playbooks/grafana.yml',
                     inventory: 'dynamic_inventory.ini',
                     credentialsId: env.SSH_CRED_ID
