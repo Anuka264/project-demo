@@ -22,6 +22,7 @@ pipeline {
             }
         }
 
+
         stage('Validate Apply') {
             input {
                 message "Do you want to apply this plan?"
